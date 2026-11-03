@@ -1,54 +1,55 @@
-# React + TypeScript + Vite
+# 온미디어: 토스 미니앱 (앱인토스)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Stitch 디자인을 React + Vite + Tailwind로 옮긴 사진 정리 도우미 미니앱이에요.
 
-Currently, two official plugins are available:
+## 시작하기
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+```bash
+npm install
+npm run dev      # 브라우저 개발 (앱인토스 devtools 패널로 SDK 흉내)
+npm run build    # dist/ 생성 + onmedia.ait 생성
+npm run deploy   # 앱인토스 콘솔 업로드 (ait token add 로 API 키 등록 필요)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+`npm run build`가 끝나면 루트에 **`onmedia.ait`** 파일이 생겨요. 이 파일을 앱인토스 콘솔에 올리면 돼요.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 동작 방식
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+토스 미니앱 SDK로는 **사진 삭제, 기기 저장공간 조회, 촬영 시간·장소 정보 읽기를 할 수 없어요.**
+그래서 이 앱은 "정리 도우미"로 동작해요.
+
+1. 사용자가 갤러리에서 사진을 고르면(한 번에 최대 50장, 누적 200장) `Device.getAlbumItems`로 받아와요. 구버전 토스 앱에서는 `Device.getPhotos`를 써요.
+2. 사진은 기기 안에서만 분석하고, 네트워크로 보내지 않아요. 분석 코드는 `src/lib/analyze.ts`에 있어요.
+   - **흔들림/초점 이탈**: 라플라시안 분산
+   - **비슷한 사진**: dHash 해밍 거리. 묶음마다 가장 선명한 1장을 베스트로 추천해요.
+   - **스크린샷**: 단색 영역 비율, 화면 비율, 선명도
+   - **어두운 사진**: 평균 밝기
+3. 정리할 사진은 앱 안의 **삭제 목록**에 담고, 실제 삭제는 사용자가 기기 사진 앱에서 직접 해요.
+4. 즐겨찾기한 사진은 정리 후보에서 빠져요. 인사이트 탭의 분석 설정은 SDK `Storage`에 저장돼요.
+
+판정 기준값은 `src/lib/analyze.ts`의 `THRESHOLD`에서 조정해요.
+
+## 구조
+
+| 파일 | 설명 |
+| --- | --- |
+| `apps-in-toss.config.ts` | 앱 이름(`appName`), 브랜드 색, 사진 권한, 내비게이션 바 |
+| `src/lib/analyze.ts` | 품질 분석과 분류 |
+| `src/lib/device.ts` | SDK 사진 불러오기, 권한, 햅틱, 저장소 |
+| `src/store.tsx` | 사진, 분석 결과, 즐겨찾기, 삭제 목록 상태 |
+| `src/tabs/*.tsx` | 홈 피드, 스마트 정리, 모먼트, 인사이트 화면 |
+| `src/components/*` | 리뷰 시트, 사진 뷰어, 토스트 등 |
+
+## Stitch 원본과 달라진 점
+
+- 가짜 iOS 상태바(9:41)와 홈 인디케이터를 지웠어요. 실제 기기 상태바와 토스 내비게이션 바가 그 자리를 대신해요.
+- 폰 프레임을 지우고 화면 전체를 쓰게 했어요. 하단 요소는 안전 영역(safe area)만큼 올렸어요.
+- 가짜 데이터(GB 용량, 인물, 지도, "지우님" 등)를 실제 분석 결과로 바꿨어요.
+- 헤더의 검색, 알림, 프로필 버튼 자리에 **삭제 목록**과 **사진 추가** 버튼을 넣었어요.
+- 시스템 뒤로가기를 누르면 열린 창, 홈 탭 순서로 닫혀요.
+
+## 출시 전 체크리스트
+
+- [ ] `apps-in-toss.config.ts`의 `appName`을 콘솔에 등록한 이름과 맞추기
+- [ ] 콘솔에 앱 아이콘과 소개 문구 등록 (사진 권한 사용 목적: "선택한 사진의 품질 분석")
+- [ ] 실제 토스 앱(샌드박스)에서 사진 선택, 권한 거부, 재요청 흐름 확인
