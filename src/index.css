@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+::-webkit-scrollbar { display: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.app-screen-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 기기 하단 홈 인디케이터 영역 확보 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 하단 탭바(56px) 바로 위 위치 — 노치/홈 인디케이터 영역을 고려해요 */
+.bottom-toast {
+  bottom: calc(64px + env(safe-area-inset-bottom));
+}
+.bottom-floating {
+  bottom: calc(60px + env(safe-area-inset-bottom));
+}
