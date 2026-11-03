@@ -1,255 +1,208 @@
 import { useState } from 'react';
 import { Icon } from '../components/Icon';
-import { fadeStyle, useRemovable } from '../components/Removable';
-import { IMG } from '../images';
-import { formatGB, useApp } from '../state';
+import { EmptyState } from '../components/EmptyState';
+import { PhotoCard } from '../components/PhotoCard';
+import { useStore } from '../store';
 
-function HeartButton() {
-  const { showToast } = useApp();
-  const [on, setOn] = useState(false);
-  return (
-    <button
-      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center active:scale-75 transition-transform"
-      onClick={() => {
-        setOn(!on);
-        if (on) showToast('즐겨찾기에서 제외되었습니다.', 'favorite_border');
-        else showToast('즐겨찾기에 추가되었습니다!', 'favorite');
-      }}
-    >
-      <Icon name={on ? 'favorite' : 'favorite_border'} className={`text-[14px] ${on ? 'text-red-500' : ''}`} />
-    </button>
-  );
-}
-
-const COLLECTIONS = [
-  { img: IMG.cafe, badge: '스토리 완성', badgeColor: 'text-primary', count: '18장', time: '오늘 14:40', place: '성수동', title: '성수동 카페 투어', tags: ['#미니멀', '#카페감성'] },
-  { img: IMG.camping, badge: '골든아워', badgeColor: 'text-tertiary', count: '12장', time: '어제 19:15', place: '강원 인제', title: '주말 캠핑 베스트샷', tags: ['#나들이', '#불멍'] },
-];
+const FILTERS = ['전체', '정리 후보', '즐겨찾기'] as const;
+const PAGE = 12;
 
 export function HomeTab({ active }: { active: boolean }) {
-  const { cleanableGB, setCleanableGB, showToast, switchTab } = useApp();
-  const [cleanState, setCleanState] = useState<'idle' | 'running' | 'done'>('idle');
-  const blurry = useRemovable(250);
+  const { photos, analysis, progress, marked, favorites, addPhotos, switchTab, openReview, showToast } = useStore();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('전체');
+  const [limit, setLimit] = useState(PAGE);
 
-  const runHomeClean = () => {
-    if (cleanableGB <= 0) {
-      showToast('이미 모든 저장공간이 최적화되었습니다.', 'check_circle');
-      return;
-    }
-    setCleanState('running');
-    setTimeout(() => {
-      setCleanableGB(0);
-      setCleanState('done');
-      showToast('성공적으로 6.2 GB 여유 공간을 확보했습니다!', 'task_alt');
-    }, 700);
-  };
+  const analyzed = photos.filter((p) => p.f).length;
+  const pending = [...analysis.candidates].filter((id) => !marked.has(id));
+  const keepPct = analyzed ? ((analyzed - analysis.candidates.size) / analyzed) * 100 : 100;
+  const candPct = analyzed ? (pending.length / analyzed) * 100 : 0;
+
+  const list = photos.filter((p) =>
+    filter === '전체' ? true : filter === '정리 후보' ? analysis.candidates.has(p.id) : favorites.has(p.id),
+  );
 
   return (
     <div className={`${active ? 'flex' : 'hidden'} flex-col gap-4 px-3.5 pt-3 pb-24`}>
-      {/* 헤더 요약 문구 */}
       <div>
         <div className="flex items-center justify-between text-[11px] text-outline font-medium">
           <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className={`w-1.5 h-1.5 rounded-full bg-primary ${progress ? 'animate-pulse' : ''}`} />
             라이브러리 보관함
           </span>
-          <span className="bg-surface-container px-2 py-0.5 rounded-full text-[10px]">최신 동기화됨</span>
-        </div>
-        <h1 className="text-xl font-bold text-on-surface tracking-tight mt-1">지우님의 사진 보관함</h1>
-        <p className="text-xs text-on-surface-variant mt-0.5">최근 촬영한 128장의 사진이 정리 대기 중이에요.</p>
-      </div>
-
-      {/* 메인 스토리지 카드 */}
-      <section className="rounded-2xl bg-surface-container-lowest p-3.5 shadow-sm border border-black/[0.03] flex flex-col gap-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <span className="text-[11px] text-outline font-medium">정리 가능한 공간</span>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-2xl font-bold text-on-surface tracking-tight">{formatGB(cleanableGB)}</span>
-              <span className="text-sm font-semibold text-on-surface">GB</span>
-            </div>
-          </div>
-          <span className="text-[11px] bg-surface-container text-on-surface font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
-            {cleanState === 'done' ? (
-              <>
-                <Icon name="verified" className="text-[14px] text-secondary" />
-                최적화 완료
-              </>
-            ) : (
-              <>
-                <Icon name="check_circle" className="text-[14px] text-primary" />
-                분석 완료
-              </>
-            )}
+          <span className="bg-surface-container px-2 py-0.5 rounded-full text-[10px]">
+            {progress ? '분석 중' : photos.length ? `${photos.length}장 분석됨` : '사진 없음'}
           </span>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden flex">
-            <div className="bg-primary h-full transition-all duration-500 rounded-l-full" style={{ width: '81.8%' }} />
-            <div className="bg-primary-container h-full transition-all duration-500" style={{ width: cleanableGB > 0 ? '4.8%' : '0%' }} />
-            <div className="bg-surface-container-highest h-full flex-1 rounded-r-full" />
-          </div>
-          <div className="flex justify-between text-[11px] text-outline">
-            <span>104.8 GB / 128 GB</span>
-            <span>유사 컷 86 · 캡처 42</span>
-          </div>
-        </div>
-        <button
-          className={`w-full h-10 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all shadow-sm ${
-            cleanState === 'done' ? 'bg-secondary' : 'bg-primary'
-          }`}
-          onClick={runHomeClean}
-        >
-          {cleanState === 'idle' && (
-            <>
-              <Icon name="auto_fix_high" className="text-[16px]" />
-              <span>저장공간 정리하기</span>
-            </>
-          )}
-          {cleanState === 'running' && (
-            <>
-              <Icon name="refresh" className="text-[15px] animate-spin" />
-              <span>정리 진행 중...</span>
-            </>
-          )}
-          {cleanState === 'done' && (
-            <>
-              <Icon name="verified" className="text-[15px]" />
-              <span>6.2 GB 정리 완료됨</span>
-            </>
-          )}
-        </button>
-      </section>
+        <h1 className="text-xl font-bold text-on-surface tracking-tight mt-1">내 사진 보관함</h1>
+        <p className="text-xs text-on-surface-variant mt-0.5">
+          {photos.length === 0
+            ? '정리하고 싶은 사진을 골라주시면 기기 안에서 바로 분석해 드려요.'
+            : pending.length > 0
+              ? `분석한 사진 중 ${pending.length}장이 정리 대기 중이에요.`
+              : '지금은 정리할 사진이 없어요.'}
+        </p>
+      </div>
 
-      {/* 추천 컬렉션 */}
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-on-surface">추천 컬렉션</h2>
-          <button className="text-[11px] text-outline flex items-center gap-0.5 hover:text-on-surface" onClick={() => switchTab('moments')}>
-            모먼트 전체
-            <Icon name="chevron_right" className="text-[13px]" />
-          </button>
-        </div>
-        <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-3.5 px-3.5 no-scrollbar">
-          {COLLECTIONS.map((c) => (
-            <article
-              key={c.title}
-              className="w-48 flex-shrink-0 bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm flex flex-col group cursor-pointer active:scale-95 transition-transform"
-              onClick={() => switchTab('moments')}
+      {photos.length === 0 ? (
+        <EmptyState title="아직 분석한 사진이 없어요" desc={'갤러리에서 사진을 한 번에 최대 50장까지 고를 수 있어요.\n흔들린 사진, 비슷한 연사, 스크린샷을 찾아드려요.'} />
+      ) : (
+        <>
+          {/* 메인 카드 */}
+          <section className="rounded-2xl bg-surface-container-lowest p-3.5 shadow-sm border border-black/[0.03] flex flex-col gap-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="text-[11px] text-outline font-medium">정리 후보</span>
+                <div className="flex items-baseline gap-1 mt-0.5">
+                  <span className="text-2xl font-bold text-on-surface tracking-tight">{pending.length}</span>
+                  <span className="text-sm font-semibold text-on-surface">장</span>
+                </div>
+              </div>
+              <span className="text-[11px] bg-surface-container text-on-surface font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                {progress ? (
+                  <>
+                    <Icon name="progress_activity" className="text-[14px] text-primary animate-spin" />
+                    분석 중 {progress.done}/{progress.total}
+                  </>
+                ) : pending.length === 0 ? (
+                  <>
+                    <Icon name="verified" className="text-[14px] text-secondary" />
+                    정리 완료
+                  </>
+                ) : (
+                  <>
+                    <Icon name="check_circle" className="text-[14px] text-primary" />
+                    분석 완료
+                  </>
+                )}
+              </span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="h-2 w-full bg-surface-container rounded-full overflow-hidden flex">
+                <div className="bg-primary h-full transition-all duration-500 rounded-l-full" style={{ width: `${keepPct}%` }} />
+                <div className="bg-primary-container h-full transition-all duration-500" style={{ width: `${candPct}%` }} />
+                <div className="bg-surface-container-highest h-full flex-1 rounded-r-full" />
+              </div>
+              <div className="flex justify-between text-[11px] text-outline">
+                <span>보관 {analyzed - analysis.candidates.size} · 담김 {marked.size}</span>
+                <span>
+                  유사 {analysis.similar.length} · 흐림 {analysis.blurry.length + analysis.dark.length} · 캡처 {analysis.screenshots.length}
+                </span>
+              </div>
+            </div>
+            <button
+              className={`w-full h-10 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all shadow-sm ${
+                pending.length === 0 && !progress ? 'bg-secondary' : 'bg-primary'
+              }`}
+              onClick={() => {
+                if (progress) return;
+                if (pending.length === 0) {
+                  showToast('정리할 사진이 없어요. 사진을 더 불러와 보세요.', 'check_circle');
+                  return;
+                }
+                switchTab('clean');
+              }}
             >
-              <div className="relative h-28 w-full overflow-hidden">
-                <img className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src={c.img} alt="" />
-                <span className={`absolute top-2 left-2 bg-white/90 backdrop-blur-md text-[10px] font-bold ${c.badgeColor} px-1.5 py-0.5 rounded-full`}>{c.badge}</span>
-                <span className="absolute bottom-2 right-2 bg-black/50 text-[9px] text-white px-1.5 py-0.5 rounded font-medium">{c.count}</span>
-              </div>
-              <div className="p-2.5 flex flex-col gap-1">
-                <div className="flex justify-between text-[10px] text-outline">
-                  <span>{c.time}</span>
-                  <span>{c.place}</span>
-                </div>
-                <h3 className="text-xs font-bold text-on-surface truncate">{c.title}</h3>
-                <div className="flex gap-1 mt-0.5">
-                  {c.tags.map((tag) => (
-                    <span key={tag} className="text-[9px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface-variant">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+              <Icon name={pending.length === 0 && !progress ? 'verified' : 'auto_fix_high'} className="text-[16px]" />
+              <span>{progress ? '분석하는 중이에요...' : pending.length === 0 ? '모두 정리했어요' : '정리 후보 확인하기'}</span>
+            </button>
+          </section>
 
-      {/* 최근 촬영 사진 피드 */}
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-on-surface">최근 촬영 사진 피드</h2>
-            <span className="text-[10px] text-outline">지능형 품질 태그 적용됨</span>
-          </div>
-          <button className="text-[10px] bg-surface-container px-2 py-0.5 rounded-full font-medium active:scale-95" onClick={() => showToast('필터 전환: 전체 사진 표시', 'tune')}>
-            필터: 전체
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {/* 카드 1 */}
-          <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
-            <div className="aspect-[3/4] relative overflow-hidden">
-              <img className="w-full h-full object-cover" src={IMG.portrait} alt="" />
-              <span className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-md text-[9px] font-bold text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                <Icon name="star" className="text-[11px]" />
-                베스트
-              </span>
-              <HeartButton />
-            </div>
-            <div className="p-2 flex flex-col">
-              <span className="text-[11px] font-bold text-on-surface truncate">서울숲 야외 스냅</span>
-              <span className="text-[9px] text-outline">14:12 · f/1.8 선명</span>
-            </div>
-          </div>
-          {/* 카드 2 (흔들림) */}
-          <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col group relative transition-all duration-300" style={fadeStyle(blurry.state, 0.85)}>
-            <div className="aspect-[3/4] relative overflow-hidden">
-              <img className="w-full h-full object-cover opacity-85" src={IMG.night} alt="" />
-              <span className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-md text-[9px] font-bold text-error px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                <Icon name="blur_on" className="text-[11px]" />
-                흔들림
-              </span>
+          {/* 비슷한 사진 묶음 */}
+          {analysis.groups.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-on-surface">비슷한 사진 묶음</h2>
+                <button className="text-[11px] text-outline flex items-center gap-0.5 hover:text-on-surface" onClick={() => switchTab('moments')}>
+                  모먼트 전체
+                  <Icon name="chevron_right" className="text-[13px]" />
+                </button>
+              </div>
+              <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-3.5 px-3.5 no-scrollbar">
+                {analysis.groups.map((g, i) => {
+                  const best = photos.find((p) => p.id === g.best);
+                  const rest = g.ids.filter((id) => id !== g.best && !marked.has(id));
+                  return (
+                    <article
+                      key={g.best}
+                      className="w-48 flex-shrink-0 bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm flex flex-col cursor-pointer active:scale-95 transition-transform"
+                      onClick={() =>
+                        openReview({
+                          title: `비슷한 사진 ${g.ids.length}장`,
+                          desc: '가장 선명한 사진을 베스트로 골랐어요. 지울 사진을 확인해 주세요.',
+                          ids: g.ids,
+                          preselected: rest,
+                          bestId: g.best,
+                        })
+                      }
+                    >
+                      <div className="relative h-28 w-full overflow-hidden">
+                        <img className="w-full h-full object-cover" src={best?.src} alt="" />
+                        <span className="absolute top-2 left-2 bg-white/90 backdrop-blur-md text-[10px] font-bold text-primary px-1.5 py-0.5 rounded-full">
+                          {rest.length ? `${rest.length}장 정리 가능` : '정리 완료'}
+                        </span>
+                        <span className="absolute bottom-2 right-2 bg-black/50 text-[9px] text-white px-1.5 py-0.5 rounded font-medium">{g.ids.length}장</span>
+                      </div>
+                      <div className="p-2.5 flex flex-col gap-1">
+                        <h3 className="text-xs font-bold text-on-surface truncate">비슷한 사진 묶음 {i + 1}</h3>
+                        <span className="text-[10px] text-outline">베스트 1장만 남기기 추천</span>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* 사진 피드 */}
+          <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-on-surface">분석한 사진</h2>
+                <span className="text-[10px] text-outline">품질 태그 자동 적용됨</span>
+              </div>
               <button
-                className="absolute bottom-1.5 right-1.5 bg-white/95 text-error px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-sm active:scale-90 transition-transform"
-                onClick={() => blurry.remove(() => showToast('1.8 MB 사진이 정리되었습니다.', 'delete'))}
+                className="text-[10px] bg-surface-container px-2 py-0.5 rounded-full font-medium active:scale-95"
+                onClick={() => {
+                  const next = FILTERS[(FILTERS.indexOf(filter) + 1) % FILTERS.length];
+                  setFilter(next);
+                  setLimit(PAGE);
+                  showToast(`필터 전환: ${next}`, 'tune');
+                }}
               >
-                <Icon name="delete" className="text-[12px]" />
-                정리
+                필터: {filter}
               </button>
             </div>
-            <div className="p-2 flex flex-col">
-              <span className="text-[11px] font-bold text-on-surface truncate">을지로 야경 스냅</span>
-              <span className="text-[9px] text-error">20:05 · 중복 연사</span>
-            </div>
-          </div>
-          {/* 카드 3 */}
-          <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
-            <div className="aspect-[3/4] relative overflow-hidden">
-              <img className="w-full h-full object-cover" src={IMG.brunch} alt="" />
-              <span className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-md text-[9px] font-medium text-on-surface px-1.5 py-0.5 rounded-full">유사 6장</span>
-              <HeartButton />
-              <button
-                className="absolute bottom-1.5 right-1.5 bg-primary text-white px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-0.5 shadow-sm active:scale-90 transition-transform"
-                onClick={() => switchTab('clean')}
-              >
-                <Icon name="auto_fix_high" className="text-[12px]" />
-                정리
+            {list.length === 0 ? (
+              <p className="text-[11px] text-outline text-center py-6">
+                {filter === '즐겨찾기' ? '♡를 눌러 지키고 싶은 사진을 모아보세요.' : '해당하는 사진이 없어요.'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {list.slice(0, limit).map((p) => (
+                  <PhotoCard key={p.id} p={p} />
+                ))}
+              </div>
+            )}
+            {list.length > limit && (
+              <button className="w-full py-2 rounded-xl bg-surface-container text-[11px] font-semibold text-on-surface-variant active:scale-[0.98]" onClick={() => setLimit(limit + PAGE)}>
+                더 보기 ({list.length - limit}장 남음)
               </button>
-            </div>
-            <div className="p-2 flex flex-col">
-              <span className="text-[11px] font-bold text-on-surface truncate">브런치 테이블</span>
-              <span className="text-[9px] text-outline">12:28 · 베스트 1선택</span>
-            </div>
-          </div>
-          {/* 카드 4 */}
-          <div className="bg-surface-container-lowest rounded-xl overflow-hidden shadow-sm flex flex-col group relative">
-            <div className="aspect-[3/4] relative overflow-hidden">
-              <img className="w-full h-full object-cover" src={IMG.jeju} alt="" />
-              <span className="absolute top-1.5 left-1.5 bg-white/90 backdrop-blur-md text-[9px] font-bold text-primary px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                <Icon name="star" className="text-[11px]" />
-                베스트
-              </span>
-              <HeartButton />
-            </div>
-            <div className="p-2 flex flex-col">
-              <span className="text-[11px] font-bold text-on-surface truncate">제주 애월 바다</span>
-              <span className="text-[9px] text-outline">09:44 · 푸른 풍경</span>
-            </div>
-          </div>
-        </div>
-      </section>
+            )}
+            <button
+              className="w-full py-2 rounded-xl border border-dashed border-outline-variant text-[11px] font-semibold text-primary flex items-center justify-center gap-1 active:scale-[0.98]"
+              onClick={addPhotos}
+              disabled={!!progress}
+            >
+              <Icon name="add_photo_alternate" className="text-[15px]" />
+              사진 더 불러오기
+            </button>
+          </section>
+        </>
+      )}
 
-      {/* 온디바이스 보안 배너 */}
       <div className="flex items-center gap-2 p-2.5 bg-surface-container rounded-xl text-[11px] text-outline">
         <Icon name="lock" className="text-primary text-[16px] flex-shrink-0" />
-        <span className="flex-1 leading-tight">모든 AI 분석은 기기 내 온디바이스에서 안전하게 실행됩니다.</span>
+        <span className="flex-1 leading-tight">사진은 기기 안에서만 분석되고 어디에도 전송되거나 저장되지 않아요.</span>
       </div>
     </div>
   );
