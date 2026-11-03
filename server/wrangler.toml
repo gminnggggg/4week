@@ -1,0 +1,17 @@
+name = "onmedia-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 배포 후 앱 Origin이 확인되면 쉼표로 구분해 넣어주세요. 비워두면 모든 Origin 허용.
+[vars]
+ALLOWED_ORIGINS = ""
+
+# IP당 1분에 30회까지 (남용·비용 폭탄 방지)
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 30
+  period = 60

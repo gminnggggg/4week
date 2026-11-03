@@ -1,4 +1,4 @@
-import { Device, Storage, PermissionError } from '@apps-in-toss/web-framework';
+import { Clipboard, Device, File, PermissionError, Share, Storage } from '@apps-in-toss/web-framework';
 
 export type PickedPhoto = { id: string; src: string };
 
@@ -20,20 +20,21 @@ function toBlobUrl(dataUri: string): string {
   return URL.createObjectURL(new Blob([bytes], { type: mime }));
 }
 
-const PICK_OPTIONS = { maxCount: 50, maxWidth: 720, base64: true } as const;
+type PickOptions = { maxCount: number; maxWidth: number };
 
-async function pickOnce() {
+async function pickOnce(opts: PickOptions) {
+  const o = { ...opts, base64: true };
   if (Device.getAlbumItems.isSupported()) {
-    const items = await Device.getAlbumItems({ ...PICK_OPTIONS, types: ['PHOTO'] });
+    const items = await Device.getAlbumItems({ ...o, types: ['PHOTO'] });
     return items.filter((i) => i.type === 'PHOTO');
   }
-  return Device.getPhotos(PICK_OPTIONS);
+  return Device.getPhotos(o);
 }
 
 export type PickResult = { ok: true; photos: PickedPhoto[] } | { ok: false; reason: 'denied' | 'error' };
 
 /** 앨범에서 사진을 고르게 하고, 권한이 없으면 권한 요청 다이얼로그를 띄워요. */
-export async function pickPhotos(): Promise<PickResult> {
+export async function pickPhotos(opts: PickOptions = { maxCount: 50, maxWidth: 720 }): Promise<PickResult> {
   try {
     const status = await Device.getPhotos.getPermission().catch(() => 'notDetermined');
     if (status === 'denied') {
@@ -42,17 +43,61 @@ export async function pickPhotos(): Promise<PickResult> {
     }
     let items;
     try {
-      items = await pickOnce();
+      items = await pickOnce(opts);
     } catch (e) {
       if (!(e instanceof PermissionError)) throw e;
       const r = await Device.getPhotos.openPermissionDialog();
       if (r !== 'allowed') return { ok: false, reason: 'denied' };
-      items = await pickOnce();
+      items = await pickOnce(opts);
     }
     return { ok: true, photos: items.map((i) => ({ id: i.id, src: toBlobUrl(i.dataUri) })) };
   } catch (e) {
     console.error(e);
     return { ok: false, reason: 'error' };
+  }
+}
+
+export async function openLink(url: string) {
+  try {
+    await Device.openURL(url);
+  } catch {
+    window.open(url, '_blank');
+  }
+}
+
+export async function copyText(text: string) {
+  try {
+    await Clipboard.setText(text);
+    return true;
+  } catch {
+    try {
+      const r = await Clipboard.setText.openPermissionDialog();
+      if (r === 'allowed') {
+        await Clipboard.setText(text);
+        return true;
+      }
+    } catch {
+      /* 아래로 */
+    }
+    return navigator.clipboard?.writeText(text).then(() => true, () => false) ?? false;
+  }
+}
+
+export async function shareText(message: string) {
+  try {
+    await Share.sendMessage({ message });
+  } catch {
+    /* 사용자가 닫음 */
+  }
+}
+
+export async function saveFile(base64: string, fileName: string, mimeType: string) {
+  if (!File.saveBase64.isSupported()) return false;
+  try {
+    await File.saveBase64({ data: base64, fileName, mimeType });
+    return true;
+  } catch {
+    return false;
   }
 }
 

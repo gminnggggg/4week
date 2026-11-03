@@ -21,7 +21,7 @@ type CardDef = {
 };
 
 export function CleanTab({ active }: { active: boolean }) {
-  const { photos, byId, analysis, marked, favorites, progress, mark, unmark, clearMarked, showToast, openReview, openViewer } = useStore();
+  const { photos, byId, analysis, marked, favorites, progress, mark, unmark, clearMarked, showToast, openReview, openViewer, addPhotos } = useStore();
 
   const live = (ids: string[]) => ids.filter((id) => !marked.has(id) && !favorites.has(id));
   const pending = [...analysis.candidates].filter((id) => !marked.has(id));
@@ -85,7 +85,7 @@ export function CleanTab({ active }: { active: boolean }) {
       <div>
         <div className="flex items-center gap-1 text-[11px] text-primary font-bold">
           <Icon name="auto_awesome" className="text-[15px]" />
-          기기 내 품질 분석
+          갤러리 공해 해결
         </div>
         <h1 className="text-xl font-bold text-on-surface tracking-tight mt-0.5">스마트 클리너</h1>
         <p className="text-xs text-on-surface-variant">품질이 낮거나 불필요한 중복 사진을 골라냈어요.</p>
@@ -185,6 +185,15 @@ export function CleanTab({ active }: { active: boolean }) {
               );
             })}
           </div>
+
+          <button
+            className="w-full py-2 rounded-xl border border-dashed border-outline-variant text-[11px] font-semibold text-primary flex items-center justify-center gap-1 active:scale-[0.98] disabled:opacity-60"
+            onClick={addPhotos}
+            disabled={!!progress}
+          >
+            <Icon name="add_photo_alternate" className="text-[15px]" />
+            사진 더 불러오기
+          </button>
 
           {/* 삭제 목록 */}
           <section className="bg-surface-container-lowest rounded-2xl p-3.5 shadow-sm border border-black/[0.02] flex flex-col gap-2">

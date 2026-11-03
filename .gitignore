@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 *.ait
+
+.env
+.env.local

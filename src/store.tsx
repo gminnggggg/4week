@@ -3,7 +3,7 @@ import { classify, DEFAULT_SETTINGS, extractFeatures, type Analysis, type Featur
 import { haptic, loadJSON, pickPhotos, saveJSON } from './lib/device';
 import type { ReviewRequest } from './components/ReviewSheet';
 
-export type TabId = 'home' | 'clean' | 'moments' | 'insights';
+export type TabId = 'home' | 'collections' | 'clean' | 'insights';
 export type Photo = { id: string; src: string; f?: Features };
 
 const MAX_PHOTOS = 200;
